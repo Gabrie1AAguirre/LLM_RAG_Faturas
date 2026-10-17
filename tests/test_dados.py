@@ -8,7 +8,7 @@ from faturas.dados import carregar_faturas, parse_amount
     ("123,45", 123.45),
     ("- 2.345,67", -2345.67),
     ("1.234,56", 1234.56),
-    ("R$\xa067,89", 45.72),
+    ("R$\xa067,89", 67.89),
     (31.5, 31.5),
     (10, 10.0),
     ("12.50", 12.5),  # CSV que já vem com ponto decimal
