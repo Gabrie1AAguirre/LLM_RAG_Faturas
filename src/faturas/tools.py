@@ -10,6 +10,8 @@ import pandas as pd
 
 from faturas.llm import MODELO_CHAT, chamar_ollama, remover_think
 
+MAX_TRANSACOES = 20
+
 
 def _normalizar(texto: str) -> str:
     sem_acento = unicodedata.normalize("NFKD", texto)
@@ -49,21 +51,31 @@ def criar_ferramentas(df: pd.DataFrame) -> list[Callable]:
         mensal = gastos.groupby(gastos["date"].dt.strftime("%Y-%m"))["amount"].sum()
         return {mes: round(float(total), 2) for mes, total in mensal.items()}
 
-    def buscar_estabelecimento(nome: str) -> list[dict]:
-        """Lista as transações cujo estabelecimento contém o nome dado (ignora maiúsculas e acentos).
+    def buscar_estabelecimento(nome: str) -> dict:
+        """Procura transações cujo estabelecimento contém o nome dado (ignora maiúsculas e acentos).
+
+        Já devolve o total gasto calculado: use esse número, não some as transações.
 
         Args:
             nome: parte do nome do estabelecimento, por exemplo "pizzaria exemplo"
 
         Returns:
-            Lista de transações com data, estabelecimento e valor
+            Quantidade de transações, total gasto e as 20 transações mais recentes
         """
-        alvo = _normalizar(nome)
+        alvo = _normalizar(nome).strip()
+        if not alvo:
+            return {"erro": "informe parte do nome do estabelecimento"}
         achados = df[df["title"].map(lambda t: alvo in _normalizar(t))]
-        return [
-            {"date": f"{l['date']:%Y-%m-%d}", "title": l["title"], "amount": float(l["amount"])}
-            for _, l in achados.iterrows()
-        ]
+        # O resultado volta para o prompt: limitar evita estourar a janela de contexto.
+        recentes = achados.sort_values("date", ascending=False).head(MAX_TRANSACOES)
+        return {
+            "quantidade": len(achados),
+            "total_gasto": round(float(achados.loc[achados["tipo"] == "gasto", "amount"].sum()), 2),
+            "transacoes": [
+                {"date": f"{l['date']:%Y-%m-%d}", "title": l["title"], "amount": float(l["amount"])}
+                for _, l in recentes.iterrows()
+            ],
+        }
 
     return [total_gasto, gastos_por_mes, buscar_estabelecimento]
 

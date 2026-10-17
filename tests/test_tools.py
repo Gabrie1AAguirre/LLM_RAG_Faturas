@@ -39,12 +39,36 @@ def test_gastos_por_mes(ferramentas):
 
 
 def test_buscar_ignora_caixa_e_acento(ferramentas):
-    assert len(ferramentas["buscar_estabelecimento"]("pizzaria exemplo")) == 1
+    assert ferramentas["buscar_estabelecimento"]("pizzaria exemplo")["quantidade"] == 1
     encontrados = ferramentas["buscar_estabelecimento"]("PADARÍA")
-    assert encontrados == [
-        {"date": "2025-12-31", "title": "Padaria", "amount": 10.0},
-        {"date": "2026-01-02", "title": "Padaria", "amount": 20.0},
-    ]
+    assert encontrados == {
+        "quantidade": 2,
+        "total_gasto": 30.0,
+        "transacoes": [
+            {"date": "2026-01-02", "title": "Padaria", "amount": 20.0},
+            {"date": "2025-12-31", "title": "Padaria", "amount": 10.0},
+        ],
+    }
+
+
+def test_buscar_limita_transacoes_mas_soma_tudo():
+    # o resultado volta para o prompt: centenas de linhas estourariam a janela de contexto
+    muitos = pd.DataFrame({
+        "date": pd.date_range("2025-01-01", periods=300),
+        "title": ["Mercado"] * 300,
+        "amount": [1.0] * 300,
+        "tipo": ["gasto"] * 300,
+    })
+    buscar = {f.__name__: f for f in criar_ferramentas(muitos)}["buscar_estabelecimento"]
+    resultado = buscar("mercado")
+    assert resultado["quantidade"] == 300
+    assert resultado["total_gasto"] == 300.0
+    assert len(resultado["transacoes"]) == 20
+    assert resultado["transacoes"][0]["date"] == "2025-10-27"  # as 20 mais recentes
+
+
+def test_buscar_nome_vazio_e_erro(ferramentas):
+    assert "erro" in ferramentas["buscar_estabelecimento"]("  ")
 
 
 def test_ferramentas_geram_schema_para_o_modelo(ferramentas):
